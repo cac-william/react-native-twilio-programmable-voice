@@ -43,7 +43,7 @@ RCT_EXPORT_MODULE()
 
 - (NSArray<NSString *> *)supportedEvents
 {
-  return @[@"connectionDidConnect", @"connectionDidDisconnect", @"callRejected", @"deviceReady", @"deviceNotReady"];
+  return @[@"connectionDidConnect", @"connectionDidDisconnect", @"callRejected", @"deviceReady", @"deviceNotReady", @"deviceDidReceiveIncoming"];
 }
 
 @synthesize bridge = _bridge;
@@ -104,13 +104,60 @@ RCT_EXPORT_METHOD(connect: (NSDictionary *)params) {
     NSUUID *uuid = [NSUUID UUID];
     NSString *handle = [params valueForKey:@"To"];
     _callParams = [[NSMutableDictionary alloc] initWithDictionary:params];
-    [self performStartCallActionWithUUID:uuid handle:handle];
+      
+    // Fix a bug of this package that it uses capital letter "To"
+    [_callParams setObject:[params valueForKey:@"To"] forKey:@"to"];
+      
+    // We don't use call kit
+    //[self performStartCallActionWithUUID:uuid handle:handle];
+      
+      [TwilioVoice configureAudioSession];
+      TwilioVoice.audioEnabled = YES;
+      self.call = [TwilioVoice call:[self fetchAccessToken]
+                             params:_callParams
+                               uuid:uuid
+                           delegate:self];
+      
+      self.callKitCompletionCallback = ^(BOOL success) {
+          NSLog(@"performCallVoiceCallWithUUID success:%d", success);
+      };
   }
 }
 
+//
+// We need to wire our own call interface
+//
 RCT_EXPORT_METHOD(disconnect) {
   NSLog(@"Disconnecting call");
   [self performEndCallActionWithUUID:self.call.uuid];
+  if (self.call) {
+    [self.call disconnect];
+  }
+}
+
+RCT_EXPORT_METHOD(accept) {
+    NSLog(@"Accept call");
+    if(self.callInvite != nil) {
+        TwilioVoice.audioEnabled = NO;
+        [self performAnswerVoiceCallWithUUID:self.callInvite.uuid completion:^(BOOL success) {
+            TwilioVoice.audioEnabled = YES;
+            NSLog(@"performAnswerVoiceCallWithUUID success:%d", success);
+        }];
+    }
+}
+
+RCT_EXPORT_METHOD(reject) {
+    NSLog(@"Reject call");
+    if(self.callInvite != nil) {
+        TwilioVoice.audioEnabled = NO;
+        [self sendEventWithName:@"callRejected" body:@"callRejected"];
+        [self.callInvite reject];
+        self.callInvite = nil;
+    }
+}
+
+RCT_EXPORT_METHOD(ignore) {
+    NSLog(@"Ignore call");
 }
 
 RCT_EXPORT_METHOD(setMuted: (BOOL *)muted) {
@@ -285,7 +332,11 @@ RCT_REMAP_METHOD(getActiveCall,
 
   self.callInvite = callInvite;
 
-  [self reportIncomingCallFrom:callInvite.from withUUID:callInvite.uuid];
+    // We don't use CallKit
+  //[self reportIncomingCallFrom:callInvite.from withUUID:callInvite.uuid];
+    
+    // Instead, send event to RN for handling
+    [self reportIncomingCall:callInvite];
 }
 
 - (void)handleCallInviteCanceled:(TVOCallInvite *)callInvite {
@@ -349,6 +400,7 @@ RCT_REMAP_METHOD(getActiveCall,
 
 - (void)call:(TVOCall *)call didDisconnectWithError:(NSError *)error {
   NSLog(@"Call disconnected with error: %@", error);
+  NSLog(@"Call disconnected with error %@", error);
 
   [self performEndCallActionWithUUID:call.uuid];
   [self callDisconnected:error];
@@ -519,6 +571,39 @@ RCT_REMAP_METHOD(getActiveCall,
       [self.callKitProvider reportCallWithUUID:uuid updated:callUpdate];
     }
   }];
+}
+
+- (void)reportIncomingCall:(TVOCallInvite *)callInvite {
+    // {
+    //     call_sid: string,  // Twilio call sid
+    //     call_state: 'PENDING' | 'CONNECTED' | 'ACCEPTED' | 'CONNECTING' 'DISCONNECTED' | 'CANCELLED',
+    //     call_from: string, // "+441234567890"
+    //     call_to: string,   // "client:bob"
+    // }
+    NSMutableDictionary *params = [[NSMutableDictionary alloc] init];
+    [params setObject:callInvite.callSid forKey:@"call_sid"];
+    
+    if (callInvite.from){
+        [params setObject:callInvite.from forKey:@"from"];
+        [params setObject:callInvite.from forKey:@"call_from"];
+    }
+    if (callInvite.to){
+        [params setObject:callInvite.to forKey:@"to"];
+        [params setObject:callInvite.to forKey:@"call_to"];
+    }
+    if (callInvite.state == TVOCallInviteStateCanceled) {
+        [params setObject:StateDisconnected forKey:@"call_state"];
+    } else if (callInvite.state == TVOCallInviteStateRejected) {
+        [params setObject:StateRejected forKey:@"call_state"];
+    } else if (callInvite.state == TVOCallInviteStateAccepted) {
+        [params setObject:@"ACCEPTED" forKey:@"call_state"];
+    } else {
+        [params setObject:StatePending forKey:@"call_state"];
+    }
+    
+    [self sendEventWithName:@"deviceDidReceiveIncoming" body:params];
+    
+    [TwilioVoice configureAudioSession];
 }
 
 - (void)reportIncomingCallFrom:(NSString *)from withUUID:(NSUUID *)uuid {

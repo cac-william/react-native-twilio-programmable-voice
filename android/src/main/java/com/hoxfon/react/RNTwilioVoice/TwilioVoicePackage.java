@@ -12,6 +12,12 @@ import java.util.List;
 
 public class TwilioVoicePackage implements ReactPackage {
 
+    private String gcmToken;
+
+    public TwilioVoicePackage(String gcmToken) {
+        this.gcmToken = gcmToken;
+    }
+
     // Deprecated in RN 0.47.0
     public List<Class<? extends JavaScriptModule>> createJSModules() {
         return Collections.emptyList();
@@ -25,7 +31,7 @@ public class TwilioVoicePackage implements ReactPackage {
     @Override
     public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
         List<NativeModule> modules = new ArrayList<>();
-        modules.add(new TwilioVoiceModule(reactContext));
+        modules.add(new TwilioVoiceModule(reactContext, gcmToken));
         return modules;
     }
 
