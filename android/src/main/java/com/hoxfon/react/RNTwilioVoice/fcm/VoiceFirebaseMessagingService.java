@@ -91,7 +91,8 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService {
                                 );
                                 // app is not in foreground
                                 if (appImportance != ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
-                                    context.startActivity(launchIntent);
+								    // TODO: It seems randomly starting activity for me... Left commented until further investigation
+                                    //context.startActivity(launchIntent);
                                 }
                                 VoiceFirebaseMessagingService.this.handleIncomingCall((ReactApplicationContext)context, notificationId, callInvite, launchIntent);
                             } else {
@@ -103,7 +104,8 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService {
                                             Log.d(TAG, "CONTEXT not present appImportance = " + appImportance);
                                         }
                                         Intent launchIntent = callNotificationManager.getLaunchIntent((ReactApplicationContext)context, notificationId, callInvite, true, appImportance);
-                                        context.startActivity(launchIntent);
+										// TODO: same as above
+                                        //context.startActivity(launchIntent);
                                         VoiceFirebaseMessagingService.this.handleIncomingCall((ReactApplicationContext)context, notificationId, callInvite, launchIntent);
                                     }
                                 });

@@ -72,11 +72,19 @@ public class CallNotificationManager {
     }
 
     public Class getMainActivityClass(ReactApplicationContext context) {
-        String packageName = context.getPackageName();
-        Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(packageName);
-        String className = launchIntent.getComponent().getClassName();
+	      // Launch intent is not entry to my react native app
+//        String packageName = context.getPackageName();
+//        Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(packageName);
+//        String className = launchIntent.getComponent().getClassName();
+//        try {
+//            return Class.forName(className);
+//        } catch (ClassNotFoundException e) {
+//            e.printStackTrace();
+//            return null;
+//        }
+
         try {
-            return Class.forName(className);
+            return Class.forName("com.m104.rn.ResumeConsultingEntryActivity");
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
             return null;
@@ -138,13 +146,14 @@ public class CallNotificationManager {
         initCallNotificationsChannel(notificationManager);
 
         NotificationCompat.Builder notificationBuilder =
-                new NotificationCompat.Builder(context, VOICE_CHANNEL)
+		        // Need GCM rather than FCM
+                new NotificationCompat.Builder(context)//, VOICE_CHANNEL)
                         .setPriority(NotificationCompat.PRIORITY_HIGH)
                         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                         .setCategory(NotificationCompat.CATEGORY_CALL)
                         .setSmallIcon(R.drawable.ic_call_white_24dp)
-                        .setContentTitle("Incoming call")
-                        .setContentText(callInvite.getFrom() + " is calling")
+                        .setContentTitle("來電中")
+                        .setContentText("履歷診療室有撥號")
                         .setOngoing(true)
                         .setAutoCancel(true)
                         .setExtras(extras)
@@ -161,22 +170,25 @@ public class CallNotificationManager {
             }
         }
 
+        // hmm... I'm crafting my own calling interface so keep them commented
+		// until i figure out how to pass status to my react-native instance 
+		
         // Reject action
-        Intent rejectIntent = new Intent(ACTION_REJECT_CALL)
-                .putExtra(INCOMING_CALL_NOTIFICATION_ID, notificationId)
-                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent pendingRejectIntent = PendingIntent.getBroadcast(context, 1, rejectIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT);
-        notificationBuilder.addAction(0, "DISMISS", pendingRejectIntent);
+//        Intent rejectIntent = new Intent(ACTION_REJECT_CALL)
+//                .putExtra(INCOMING_CALL_NOTIFICATION_ID, notificationId)
+//                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+//        PendingIntent pendingRejectIntent = PendingIntent.getBroadcast(context, 1, rejectIntent,
+//                PendingIntent.FLAG_UPDATE_CURRENT);
+//        notificationBuilder.addAction(0, "取消", pendingRejectIntent);
 
         // Answer action
-        Intent answerIntent = new Intent(ACTION_ANSWER_CALL);
-        answerIntent
-                .putExtra(INCOMING_CALL_NOTIFICATION_ID, notificationId)
-                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent pendingAnswerIntent = PendingIntent.getBroadcast(context, 0, answerIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT);
-        notificationBuilder.addAction(R.drawable.ic_call_white_24dp, "ANSWER", pendingAnswerIntent);
+//        Intent answerIntent = new Intent(ACTION_ANSWER_CALL);
+//        answerIntent
+//                .putExtra(INCOMING_CALL_NOTIFICATION_ID, notificationId)
+//                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+//        PendingIntent pendingAnswerIntent = PendingIntent.getBroadcast(context, 0, answerIntent,
+//                PendingIntent.FLAG_UPDATE_CURRENT);
+//        notificationBuilder.addAction(R.drawable.ic_call_white_24dp, "接受", pendingAnswerIntent);
 
         notificationManager.notify(notificationId, notificationBuilder.build());
         TwilioVoiceModule.callNotificationMap.put(INCOMING_NOTIFICATION_PREFIX+callInvite.getCallSid(), notificationId);
@@ -222,15 +234,16 @@ public class CallNotificationManager {
          * Create the notification shown in the notification drawer
          */
         NotificationCompat.Builder notification =
-                new NotificationCompat.Builder(context, VOICE_CHANNEL)
+		        // Need GCM
+                new NotificationCompat.Builder(context)//, VOICE_CHANNEL)
                         .setGroup(MISSED_CALLS_GROUP)
                         .setGroupSummary(true)
                         .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                         .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                         .setSmallIcon(R.drawable.ic_call_missed_white_24dp)
-                        .setContentTitle("Missed call")
-                        .setContentText(callInvite.getFrom() + " called")
+                        .setContentTitle("未接來電")
+                        .setContentText("履歷診療室未接來電")
                         .setAutoCancel(true)
                         .setShowWhen(true)
                         .setExtras(extras)
@@ -241,9 +254,9 @@ public class CallNotificationManager {
         missedCalls++;
         if (missedCalls == 1) {
             inboxStyle = new NotificationCompat.InboxStyle();
-            inboxStyle.setBigContentTitle("Missed call");
+            inboxStyle.setBigContentTitle("未接來電");
         } else {
-            inboxStyle.setBigContentTitle(String.valueOf(missedCalls) + " missed calls");
+            inboxStyle.setBigContentTitle("履歷診療室未接來電");
         }
         inboxStyle.addLine("from: " +callInvite.getFrom());
         sharedPrefEditor.putInt(MISSED_CALLS_GROUP, missedCalls);
@@ -287,8 +300,8 @@ public class CallNotificationManager {
         extras.putString(CALL_SID_KEY, callSid);
         extras.putString(NOTIFICATION_TYPE, ACTION_HANGUP_CALL);
 
-        NotificationCompat.Builder notification = new NotificationCompat.Builder(context, VOICE_CHANNEL)
-                .setContentTitle("Call in progress")
+        NotificationCompat.Builder notification = new NotificationCompat.Builder(context)//, VOICE_CHANNEL)
+                .setContentTitle("通話中")
                 .setContentText(caller)
                 .setSmallIcon(R.drawable.ic_call_white_24dp)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -299,7 +312,7 @@ public class CallNotificationManager {
                 .setExtras(extras)
                 .setContentIntent(activityPendingIntent);
 
-        notification.addAction(0, "HANG UP", pendingHangupIntent);
+//        notification.addAction(0, "掛斷", pendingHangupIntent);
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         // Create notifications channel (required for API > 25)
         initCallNotificationsChannel(notificationManager);
